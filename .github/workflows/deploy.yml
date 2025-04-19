@@ -21,6 +21,6 @@ jobs:
           echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_SERVER }} >> ~/.ssh/known_hosts
-          echo "put index.php ${{ secrets.SFTP_TARGET_DIR }}/index.php" > sftp_batch.txt
+          echo "put index.php index.php" > sftp_batch.txt
           sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }}
           rm sftp_batch.txt
