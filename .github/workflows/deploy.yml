@@ -17,6 +17,7 @@ jobs:
 
       - name: SFTP upload index.php only (debug)
         run: |
+          mkdir -p ~/.ssh
           echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_SERVER }} >> ~/.ssh/known_hosts
