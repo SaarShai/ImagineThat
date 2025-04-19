@@ -1,9 +1,9 @@
 <?php
 // Database configuration
-$host = 'localhost';
-$db   = 'imaginethat';
-$user = 'your_db_user';
-$pass = 'your_db_password';
+$host = 'pixie-db.imaginethat.one';
+$db   = 'imaginethat_one';
+$user = 'imaginethat_one';
+$pass = 'CXWbykwJIkCoYj5c$bzUqndKgG';
 $charset = 'utf8mb4';
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
 $options = [
