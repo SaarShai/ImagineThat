@@ -15,34 +15,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up SSH key
+      - name: SFTP upload index.php only (debug)
         run: |
-          mkdir -p ~/.ssh
           echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_SERVER }} >> ~/.ssh/known_hosts
-
-      - name: SFTP upload files
-        run: |
-          find . -type f \
-            ! -path './.git*' \
-            ! -path './.github*' \
-            ! -name 'README.md' \
-            ! -name 'db.sql' \
-            | while read file; do
-                remotepath="${file#./}"
-                dir=$(dirname "$remotepath")
-                # Recursively create all parent directories
-                mkdir_cmds=""
-                IFS='/' read -ra PARTS <<< "$dir"
-                path="${{ secrets.SFTP_TARGET_DIR }}"
-                for part in "${PARTS[@]}"; do
-                  if [ "$part" != "." ] && [ "$part" != "" ]; then
-                    path="$path/$part"
-                    mkdir_cmds="$mkdir_cmds\nmkdir \"$path\""
-                  fi
-                done
-                echo -e "$mkdir_cmds\nput \"$file\" \"${{ secrets.SFTP_TARGET_DIR }}/$remotepath\"" > sftp_batch.txt
-                sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }}
-                rm sftp_batch.txt
-              done
+          echo "put index.php ${{ secrets.SFTP_TARGET_DIR }}/index.php" > sftp_batch.txt
+          sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }}
+          rm sftp_batch.txt
