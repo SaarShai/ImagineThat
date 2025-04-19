@@ -16,12 +16,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: SFTP Deploy with SSH Key
-        uses: appleboy/sftp-action@v0.0.10
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          host: ${{ secrets.SFTP_SERVER }}
+          server: ${{ secrets.SFTP_SERVER }}
           username: ${{ secrets.SFTP_USERNAME }}
           port: ${{ secrets.SFTP_PORT }}
-          key: ${{ secrets.SFTP_PRIVATE_KEY }}
-          source: "./*"
-          target: ${{ secrets.SFTP_TARGET_DIR }}
-          strip_components: 1
+          private-key: ${{ secrets.SFTP_PRIVATE_KEY }}
+          local-dir: ./
+          server-dir: ${{ secrets.SFTP_TARGET_DIR }}
+          protocol: sftp
+          exclude: |
+            .git*
+            .github*
+            README.md
+            db.sql
