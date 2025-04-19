@@ -21,6 +21,14 @@ jobs:
           echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_SERVER }} >> ~/.ssh/known_hosts
+          # First create essential directories to ensure they exist
+          echo "mkdir \"www/assets\"" > create_dirs.txt
+          echo "mkdir \"www/assets/css\"" >> create_dirs.txt
+          echo "mkdir \"www/assets/js\"" >> create_dirs.txt
+          sftp -b create_dirs.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }} || true
+          rm create_dirs.txt
+
+          # Then upload all files
           find . -type f \
             ! -path './.git*' \
             ! -path './.github*' \
