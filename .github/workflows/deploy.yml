@@ -1,0 +1,31 @@
+# This workflow will deploy your entire repo to your PHP hosting via SFTP on every push to main
+# Uses SamKirkland/FTP-Deploy-Action for secure deployment
+
+name: 🚀 SFTP Deploy to Hosting
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: SFTP Deploy with SSH Key
+        uses: wangyucode/sftp-upload-action@v1.3
+        with:
+          host: ${{ secrets.SFTP_SERVER }}
+          username: ${{ secrets.SFTP_USERNAME }}
+          port: ${{ secrets.SFTP_PORT }}
+          privateKey: ${{ secrets.SFTP_PRIVATE_KEY }}
+          localDir: ./
+          remoteDir: ${{ secrets.SFTP_TARGET_DIR }}
+          exclude: |
+            .git*
+            .github*
+            README.md
+            db.sql
