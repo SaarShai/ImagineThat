@@ -24,8 +24,3 @@ jobs:
           privateKey: ${{ secrets.SFTP_PRIVATE_KEY }}
           localDir: ./
           remoteDir: ${{ secrets.SFTP_TARGET_DIR }}
-          exclude: |
-            .git*
-            .github*
-            README.md
-            db.sql
