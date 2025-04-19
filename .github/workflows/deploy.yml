@@ -15,20 +15,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: SFTP Deploy with SSH Key
-        uses: atymic/sftp-deploy@v2.0.0
-        with:
-          server: ${{ secrets.SFTP_SERVER }}
-          username: ${{ secrets.SFTP_USERNAME }}
-          port: ${{ secrets.SFTP_PORT }}
-          ssh_private_key: ${{ secrets.SFTP_PRIVATE_KEY }}
-          local_path: ./
-          remote_path: ${{ secrets.SFTP_TARGET_DIR }}
-          args: "-o StrictHostKeyChecking=no"
-          dry_run: false
-          delete_remote_files: false
-          exclude: |
-            .git*
-            .github*
-            README.md
-            db.sql
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_SERVER }} >> ~/.ssh/known_hosts
+
+      - name: SFTP upload files
+        run: |
+          find . -type f \
+            ! -path './.git*' \
+            ! -path './.github*' \
+            ! -name 'README.md' \
+            ! -name 'db.sql' \
+            | while read file; do
+                remotepath="${file#./}"
+                dir=$(dirname "$remotepath")
+                if [ "$dir" != "." ]; then
+                  ssh -i ~/.ssh/id_rsa -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }} "mkdir -p '${{ secrets.SFTP_TARGET_DIR }}/$dir'"
+                fi
+                echo "put \"$file\" \"${{ secrets.SFTP_TARGET_DIR }}/$remotepath\"" > sftp_batch.txt
+                sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }}
+                rm sftp_batch.txt
+              done
