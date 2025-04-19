@@ -16,11 +16,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: SFTP Deploy with SSH Key
-        uses: wangyucode/sftp-upload-action@v1.3
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SFTP_SERVER }}
           username: ${{ secrets.SFTP_USERNAME }}
           port: ${{ secrets.SFTP_PORT }}
-          privateKey: ${{ secrets.SFTP_PRIVATE_KEY }}
-          localDir: ./
-          remoteDir: ${{ secrets.SFTP_TARGET_DIR }}
+          key: ${{ secrets.SFTP_PRIVATE_KEY }}
+          source: ./
+          target: ${{ secrets.SFTP_TARGET_DIR }}
+          rm: false
