@@ -32,10 +32,13 @@ jobs:
             | while read file; do
                 remotepath="${file#./}"
                 dir=$(dirname "$remotepath")
+                # Create remote directory using SFTP batch
                 if [ "$dir" != "." ]; then
-                  ssh -i ~/.ssh/id_rsa -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }} "mkdir -p '${{ secrets.SFTP_TARGET_DIR }}/$dir'"
+                  echo "mkdir \"${{ secrets.SFTP_TARGET_DIR }}/$dir\"" > sftp_batch.txt
+                else
+                  echo "" > sftp_batch.txt
                 fi
-                echo "put \"$file\" \"${{ secrets.SFTP_TARGET_DIR }}/$remotepath\"" > sftp_batch.txt
+                echo "put \"$file\" \"${{ secrets.SFTP_TARGET_DIR }}/$remotepath\"" >> sftp_batch.txt
                 sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }}
                 rm sftp_batch.txt
               done
