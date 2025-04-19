@@ -21,6 +21,7 @@ jobs:
           echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_SERVER }} >> ~/.ssh/known_hosts
+          > sftp_batch.txt
           find . -type f \
             ! -path './.git*' \
             ! -path './.github*' \
@@ -30,16 +31,15 @@ jobs:
                 remotepath="${file#./}"
                 dir=$(dirname "$remotepath")
                 # Recursively create all parent directories in www
-                mkdir_cmds=""
                 IFS='/' read -ra PARTS <<< "$dir"
                 path="www"
                 for part in "${PARTS[@]}"; do
                   if [ "$part" != "." ] && [ "$part" != "" ]; then
                     path="$path/$part"
-                    mkdir_cmds="$mkdir_cmds\nmkdir \"$path\""
+                    echo "mkdir \"$path\"" >> sftp_batch.txt
                   fi
                 done
-                echo -e "$mkdir_cmds\nput \"$file\" \"www/$remotepath\"" > sftp_batch.txt
-                sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }}
-                rm sftp_batch.txt
+                echo "put \"$file\" \"www/$remotepath\"" >> sftp_batch.txt
               done
+          sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }}
+          rm sftp_batch.txt
