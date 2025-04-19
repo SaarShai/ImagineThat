@@ -21,8 +21,6 @@ jobs:
           echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_SERVER }} >> ~/.ssh/known_hosts
-          > sftp_batch.txt
-          # Collect all directories to be created
           find . -type f \
             ! -path './.git*' \
             ! -path './.github*' \
@@ -30,29 +28,7 @@ jobs:
             ! -name 'db.sql' \
             | while read file; do
                 remotepath="${file#./}"
-                dir=$(dirname "$remotepath")
-                IFS='/' read -ra PARTS <<< "$dir"
-                path="www"
-                for part in "${PARTS[@]}"; do
-                  if [ "$part" != "." ] && [ "$part" != "" ]; then
-                    path="$path/$part"
-                    echo "$path"
-                  fi
-                done
-              done | sort | uniq > dirs_to_create.txt
-          # Add mkdir commands for each unique directory
-          while read dir; do
-            echo "mkdir \"$dir\"" >> sftp_batch.txt
-          done < dirs_to_create.txt
-          # Add put commands for all files
-          find . -type f \
-            ! -path './.git*' \
-            ! -path './.github*' \
-            ! -name 'README.md' \
-            ! -name 'db.sql' \
-            | while read file; do
-                remotepath="${file#./}"
-                echo "put \"$file\" \"www/$remotepath\"" >> sftp_batch.txt
+                echo "put \"$file\" \"www/$remotepath\"" > sftp_batch.txt
+                sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }} || true
+                rm sftp_batch.txt
               done
-          sftp -b sftp_batch.txt -i ~/.ssh/id_rsa -P ${{ secrets.SFTP_PORT }} ${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_SERVER }}
-          rm sftp_batch.txt dirs_to_create.txt
