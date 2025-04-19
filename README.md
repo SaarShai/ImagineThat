@@ -40,3 +40,4 @@ A ready-to-upload PHP+MySQL user account system for imaginethat.com. Users can s
 
 ---
 Enjoy your new user account system!
+ 
