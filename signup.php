@@ -1,12 +1,44 @@
 <?php
 require_once 'config.php';
 
+// Function to send verification email
+function sendVerificationEmail($email, $username, $verification_code) {
+    $to = $email;
+    $subject = 'Verify Your ImagineThat Account';
+    
+    $message = "<html><body>";
+    $message .= "<h2>Welcome to ImagineThat!</h2>";
+    $message .= "<p>Hello $username,</p>";
+    $message .= "<p>Thank you for creating an account. To complete your registration, please verify your email by clicking the link below:</p>";
+    
+    // Create the verification link - use your actual domain
+    $verificationLink = "https://imaginethat.one/verify.php?code=$verification_code";
+    
+    $message .= "<p><a href='$verificationLink'>Verify My Account</a></p>";
+    $message .= "<p>If the button above doesn't work, copy and paste this URL into your browser:</p>";
+    $message .= "<p>$verificationLink</p>";
+    $message .= "<p>Thank you,<br>The ImagineThat Team</p>";
+    $message .= "</body></html>";
+    
+    // Set email headers for HTML email
+    $headers = "MIME-Version: 1.0" . "\r\n";
+    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+    $headers .= "From: ImagineThat <noreply@imaginethat.one>" . "\r\n";
+    
+    // Send email
+    return mail($to, $subject, $message, $headers);
+}
+
 $errors = [];
+$success = false;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
+    $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm = $_POST['confirm_password'];
 
+    // Validate inputs
     if ($password !== $confirm) {
         $errors[] = 'Passwords do not match.';
     }
@@ -16,17 +48,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (strlen($password) < 6) {
         $errors[] = 'Password must be at least 6 characters.';
     }
-    if (!$errors) {
-        $stmt = $pdo->prepare('SELECT id FROM users WHERE username = ?');
-        $stmt->execute([$username]);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Please enter a valid email address.';
+    }
+    
+    if (empty($errors)) {
+        // Check if username or email already exists
+        $stmt = $pdo->prepare('SELECT id FROM users WHERE username = ? OR email = ?');
+        $stmt->execute([$username, $email]);
+        
         if ($stmt->fetch()) {
-            $errors[] = 'Username already taken.';
+            // Run specific checks to give better error messages
+            $usernameCheck = $pdo->prepare('SELECT id FROM users WHERE username = ?');
+            $usernameCheck->execute([$username]);
+            
+            $emailCheck = $pdo->prepare('SELECT id FROM users WHERE email = ?');
+            $emailCheck->execute([$email]);
+            
+            if ($usernameCheck->fetch()) {
+                $errors[] = 'Username already taken.';
+            }
+            
+            if ($emailCheck->fetch()) {
+                $errors[] = 'Email address already registered.';
+            }
         } else {
+            // Generate verification code
+            $verification_code = bin2hex(random_bytes(32));
+            
+            // Hash password for security
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare('INSERT INTO users (username, password) VALUES (?, ?)');
-            $stmt->execute([$username, $hash]);
-            header('Location: login.php?signup=1');
-            exit();
+            
+            try {
+                // Insert the new user
+                $stmt = $pdo->prepare('INSERT INTO users (username, email, password, verification_code) VALUES (?, ?, ?, ?)');
+                $stmt->execute([$username, $email, $hash, $verification_code]);
+                
+                // Send verification email
+                if (sendVerificationEmail($email, $username, $verification_code)) {
+                    $success = true;
+                } else {
+                    $errors[] = 'Could not send verification email. Please try again or contact support.';
+                }
+            } catch (PDOException $e) {
+                $errors[] = 'Database error: ' . $e->getMessage();
+            }
         }
     }
 }
@@ -138,6 +204,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 1px 8px #fee2e255;
             animation: fadeInUp 0.7s cubic-bezier(.4,0,.2,1);
         }
+        .success-msg {
+            color: #166534;
+            background: #dcfce7dd;
+            border-radius: 8px;
+            padding: 0.9em 1.2em;
+            margin-bottom: 1em;
+            font-size: 1.01rem;
+            border: 1.2px solid #bbf7d0;
+            box-shadow: 0 1px 8px #dcfce755;
+            animation: fadeInUp 0.7s cubic-bezier(.4,0,.2,1);
+            text-align: left;
+        }
+        .success-msg h3 {
+            color: #15803d;
+            margin-top: 0;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+        }
         @keyframes fadeInUp {
             0% { opacity: 0; transform: translateY(30px); }
             100% { opacity: 1; transform: translateY(0); }
@@ -160,18 +244,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="login-bg">
     <div class="centered-card fade-in">
         <h1 class="logo-title">Sign Up</h1>
-        <?php if ($errors): ?>
-            <div class="error-msg"><?php echo implode('<br>', $errors); ?></div>
+        <?php if ($success): ?>
+            <div class="success-msg">
+                <h3>Registration Successful!</h3>
+                <p>We've sent a verification email to your email address. Please check your inbox and click the verification link to activate your account.</p>
+                <div class="switch-link" style="margin-top: 15px;">
+                    <a href="index.php">Back to Login</a>
+                </div>
+            </div>
+        <?php else: ?>
+            <?php if ($errors): ?>
+                <div class="error-msg"><?php echo implode('<br>', $errors); ?></div>
+            <?php endif; ?>
+            <form action="signup.php" method="post" class="form">
+                <input type="text" name="username" placeholder="Username" required autofocus value="<?php echo isset($username) ? htmlspecialchars($username) : ''; ?>">
+                <input type="email" name="email" placeholder="Email Address" required value="<?php echo isset($email) ? htmlspecialchars($email) : ''; ?>">
+                <input type="password" name="password" placeholder="Password" required>
+                <input type="password" name="confirm_password" placeholder="Confirm Password" required>
+                <button type="submit" class="btn">Sign Up</button>
+            </form>
+            <div class="switch-link">
+                <span>Already have an account?</span> <a href="index.php">Log In</a>
+            </div>
         <?php endif; ?>
-        <form action="signup.php" method="post" class="form">
-            <input type="text" name="username" placeholder="Username" required autofocus>
-            <input type="password" name="password" placeholder="Password" required>
-            <input type="password" name="confirm_password" placeholder="Confirm Password" required>
-            <button type="submit" class="btn">Sign Up</button>
-        </form>
-        <div class="switch-link">
-            <span>Already have an account?</span> <a href="index.php">Log In</a>
-        </div>
     </div>
 </body>
 </html>

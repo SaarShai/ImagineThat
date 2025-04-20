@@ -1,41 +1,39 @@
 <?php
 require_once 'config.php';
-session_start();
 
-$signup_success = isset($_GET['signup']) && $_GET['signup'] == '1';
-$verified = isset($_GET['verified']) && $_GET['verified'] == '1';
+$error = null;
+$success = false;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $login = trim($_POST['login']); // Can be username or email
-    $password = $_POST['password'];
+// Check if verification code is present
+if (isset($_GET['code']) && !empty($_GET['code'])) {
+    $code = $_GET['code'];
     
-    // Check if login is email or username
-    $is_email = filter_var($login, FILTER_VALIDATE_EMAIL);
-    
-    if ($is_email) {
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ?');
-    } else {
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE username = ?');
-    }
-    
-    $stmt->execute([$login]);
+    // Find user with matching verification code
+    $stmt = $pdo->prepare('SELECT * FROM users WHERE verification_code = ?');
+    $stmt->execute([$code]);
     $user = $stmt->fetch();
     
-    if ($user && password_verify($password, $user['password'])) {
-        // Check if user is verified
-        if (!$user['is_verified']) {
-            $error = 'Please verify your email address before logging in. Check your inbox for the verification email.';
+    if ($user) {
+        // If user is already verified
+        if ($user['is_verified']) {
+            $message = 'Your account is already verified. You can log in.';
+            $success = true;
         } else {
-            // Login successful
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['email'] = $user['email'];
-            header('Location: dashboard.php');
-            exit();
+            // Verify the user
+            $updateStmt = $pdo->prepare('UPDATE users SET is_verified = 1, verification_code = NULL WHERE id = ?');
+            
+            if ($updateStmt->execute([$user['id']])) {
+                $message = 'Your account has been successfully verified! You can now log in.';
+                $success = true;
+            } else {
+                $error = 'Could not verify account. Please try again or contact support.';
+            }
         }
     } else {
-        $error = 'Invalid login credentials.';
+        $error = 'Invalid verification code or the code has expired.';
     }
+} else {
+    $error = 'No verification code provided.';
 }
 ?>
 <!DOCTYPE html>
@@ -43,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - ImagineThat</title>
+    <title>Verify Account - ImagineThat</title>
     <style>
         /* Minimalist, elegant UI */
         body, html {
@@ -81,26 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-shadow: 0 2px 18px #6366f133;
             font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
         }
-        .form input {
-            width: 100%;
-            padding: 0.85rem 1.1rem;
-            margin: 0.7rem 0;
-            border: 1.5px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 1.06rem;
-            background: rgba(248,250,252,0.93);
-            transition: border 0.22s, box-shadow 0.22s;
-            box-shadow: 0 1.5px 8px rgba(99,102,241,0.04);
-        }
-        .form input:focus {
-            border: 1.5px solid #6366f1;
-            outline: none;
-            box-shadow: 0 0 0 2px #6366f133;
-            background: #fff;
-        }
         .btn {
-            width: 100%;
-            padding: 0.95rem 0;
+            padding: 0.95rem 2rem;
             background: linear-gradient(90deg, #6366f1 0%, #818cf8 100%);
             color: #fff;
             border: none;
@@ -113,26 +93,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             letter-spacing: 0.01em;
             transition: background 0.22s, box-shadow 0.22s, transform 0.13s;
             will-change: transform;
+            display: inline-block;
+            text-decoration: none;
         }
         .btn:hover, .btn:focus {
             background: linear-gradient(90deg, #818cf8 0%, #6366f1 100%);
             box-shadow: 0 6px 24px rgba(99,102,241,0.13);
             transform: translateY(-2px) scale(1.025);
             outline: none;
-        }
-        .switch-link {
-            margin-top: 1.2rem;
-            color: #999;
-            font-size: 0.96rem;
-        }
-        .switch-link a {
-            color: #6366f1;
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-        .switch-link a:hover {
-            color: #4f46e5;
         }
         .error-msg {
             color: #b91c1c;
@@ -144,6 +112,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border: 1.2px solid #fecaca;
             box-shadow: 0 1px 8px #fee2e255;
             animation: fadeInUp 0.7s cubic-bezier(.4,0,.2,1);
+        }
+        .success-msg {
+            color: #166534;
+            background: #dcfce7dd;
+            border-radius: 8px;
+            padding: 0.9em 1.2em;
+            margin-bottom: 1em;
+            font-size: 1.01rem;
+            border: 1.2px solid #bbf7d0;
+            box-shadow: 0 1px 8px #dcfce755;
+            animation: fadeInUp 0.7s cubic-bezier(.4,0,.2,1);
+            text-align: left;
+        }
+        .success-msg h3 {
+            color: #15803d;
+            margin-top: 0;
+            margin-bottom: 0.5em;
+            font-weight: 600;
         }
         @keyframes fadeInUp {
             0% { opacity: 0; transform: translateY(30px); }
@@ -166,35 +152,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="login-bg">
     <div class="centered-card fade-in">
-        <h1 class="logo-title">Log In</h1>
+        <h1 class="logo-title">Account Verification</h1>
         
-        <?php if ($verified): ?>
+        <?php if ($success): ?>
             <div class="success-msg">
-                <h3>Email Verified!</h3>
-                <p>Your account has been successfully verified. You can now log in with your credentials.</p>
+                <h3>Success!</h3>
+                <p><?php echo $message; ?></p>
             </div>
-        <?php endif; ?>
-        
-        <?php if ($signup_success): ?>
-            <div class="success-msg">
-                <h3>Registration Successful!</h3>
-                <p>Your account has been created. You may now log in with your credentials.</p>
-            </div>
-        <?php endif; ?>
-        
-        <?php if (isset($error)): ?>
+        <?php elseif ($error): ?>
             <div class="error-msg"><?php echo $error; ?></div>
         <?php endif; ?>
         
-        <form action="login.php" method="post" class="form">
-            <input type="text" name="login" placeholder="Username or Email" required autofocus>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" class="btn">Log In</button>
-        </form>
-        
-        <div class="switch-link">
-            <span>Don't have an account?</span> <a href="signup.php">Sign Up</a>
-        </div>
+        <a href="index.php" class="btn">Go to Login</a>
     </div>
 </body>
 </html>
