@@ -80,16 +80,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             
             try {
-                // Insert the new user
-                $stmt = $pdo->prepare('INSERT INTO users (username, email, password, verification_code) VALUES (?, ?, ?, ?)');
+                // Insert the new user - automatically verified (is_verified = 1)
+                $stmt = $pdo->prepare('INSERT INTO users (username, email, password, verification_code, is_verified) VALUES (?, ?, ?, ?, 1)');
                 $stmt->execute([$username, $email, $hash, $verification_code]);
                 
-                // Send verification email
-                if (sendVerificationEmail($email, $username, $verification_code)) {
-                    $success = true;
-                } else {
-                    $errors[] = 'Could not send verification email. Please try again or contact support.';
-                }
+                // Skip email verification temporarily
+                $success = true;
+                
+                // Commented out for now - will implement with Amazon SES later
+                // if (sendVerificationEmail($email, $username, $verification_code)) {
+                //     $success = true;
+                // } else {
+                //     $errors[] = 'Could not send verification email. Please try again or contact support.';
+                // }
             } catch (PDOException $e) {
                 $errors[] = 'Database error: ' . $e->getMessage();
             }
@@ -247,7 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($success): ?>
             <div class="success-msg">
                 <h3>Registration Successful!</h3>
-                <p>We've sent a verification email to your email address. Please check your inbox and click the verification link to activate your account.</p>
+                <p>Your account has been created successfully and is ready to use! You can now log in with your credentials.</p>
                 <div class="switch-link" style="margin-top: 15px;">
                     <a href="index.php">Back to Login</a>
                 </div>
