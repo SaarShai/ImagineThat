@@ -293,9 +293,7 @@ while ($row = $stats_stmt->fetch()) {
         <div class="tab-content" id="games">
             <h2>Games</h2>
             <div class="games-menu">
-                <a href="https://game1.imaginethat.com" class="game-link">Game 1</a>
-                <a href="https://game2.imaginethat.com" class="game-link">Game 2</a>
-                <!-- Add more games as needed -->
+                <a href="https://memRPG.imaginethat.one" class="game-link">memRPG</a>
             </div>
         </div>
     </div>
