@@ -6,7 +6,8 @@ $signup_success = isset($_GET['signup']) && $_GET['signup'] == '1';
 $verified = isset($_GET['verified']) && $_GET['verified'] == '1';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $login = trim($_POST['login']); // Can be username or email
+    // Check whether the form has 'login' or 'username' field - depends on which page users are coming from
+    $login = isset($_POST['login']) ? trim($_POST['login']) : trim($_POST['username']);
     $password = $_POST['password'];
     
     // Check if login is email or username
