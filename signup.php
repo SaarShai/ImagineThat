@@ -1,32 +1,48 @@
 <?php
 require_once 'config.php';
 
-// Function to send verification email
+// Function to send verification email via PHPMailer and Amazon SES
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+require_once __DIR__ . '/vendor/autoload.php';
+
 function sendVerificationEmail($email, $username, $verification_code) {
-    $to = $email;
-    $subject = 'Verify Your ImagineThat Account';
-    
-    $message = "<html><body>";
-    $message .= "<h2>Welcome to ImagineThat!</h2>";
-    $message .= "<p>Hello $username,</p>";
-    $message .= "<p>Thank you for creating an account. To complete your registration, please verify your email by clicking the link below:</p>";
-    
-    // Create the verification link - use your actual domain
-    $verificationLink = "https://imaginethat.one/verify.php?code=$verification_code";
-    
-    $message .= "<p><a href='$verificationLink'>Verify My Account</a></p>";
-    $message .= "<p>If the button above doesn't work, copy and paste this URL into your browser:</p>";
-    $message .= "<p>$verificationLink</p>";
-    $message .= "<p>Thank you,<br>The ImagineThat Team</p>";
-    $message .= "</body></html>";
-    
-    // Set email headers for HTML email
-    $headers = "MIME-Version: 1.0" . "\r\n";
-    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-    $headers .= "From: ImagineThat <noreply@imaginethat.one>" . "\r\n";
-    
-    // Send email
-    return mail($to, $subject, $message, $headers);
+    $mail = new PHPMailer(true);
+    try {
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host = $_ENV['SES_SMTP_HOST'];
+        $mail->SMTPAuth = true;
+        $mail->Username = $_ENV['SES_SMTP_USERNAME'];
+        $mail->Password = $_ENV['SES_SMTP_PASSWORD'];
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port = $_ENV['SES_SMTP_PORT'];
+
+        // Recipients
+        $mail->setFrom($_ENV['SES_FROM_ADDRESS'], 'ImagineThat');
+        $mail->addAddress($email, $username);
+        $mail->isHTML(true);
+        $mail->Subject = 'Verify Your ImagineThat Account';
+
+        // Email body
+        $verificationLink = "https://imaginethat.one/verify.php?code=$verification_code";
+        $mail->Body = "<html><body>"
+            . "<h2>Welcome to ImagineThat!</h2>"
+            . "<p>Hello $username,</p>"
+            . "<p>Thank you for creating an account. To complete your registration, please verify your email by clicking the link below:</p>"
+            . "<p><a href='$verificationLink'>Verify My Account</a></p>"
+            . "<p>If the button above doesn't work, copy and paste this URL into your browser:</p>"
+            . "<p>$verificationLink</p>"
+            . "<p>Thank you,<br>The ImagineThat Team</p>"
+            . "</body></html>";
+        $mail->AltBody = "Hello $username,\n\nThank you for creating an account. To complete your registration, please verify your email by visiting this link: $verificationLink\n\nThank you, The ImagineThat Team";
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log('Mailer Error: ' . $mail->ErrorInfo);
+        return false;
+    }
 }
 
 $errors = [];
@@ -80,19 +96,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             
             try {
-                // Insert the new user - automatically verified (is_verified = 1)
-                $stmt = $pdo->prepare('INSERT INTO users (username, email, password, verification_code, is_verified) VALUES (?, ?, ?, ?, 1)');
+                // Insert the new user (not verified yet)
+                $stmt = $pdo->prepare('INSERT INTO users (username, email, password, verification_code, is_verified) VALUES (?, ?, ?, ?, 0)');
                 $stmt->execute([$username, $email, $hash, $verification_code]);
                 
-                // Skip email verification temporarily
-                $success = true;
-                
-                // Commented out for now - will implement with Amazon SES later
-                // if (sendVerificationEmail($email, $username, $verification_code)) {
-                //     $success = true;
-                // } else {
-                //     $errors[] = 'Could not send verification email. Please try again or contact support.';
-                // }
+                // Send verification email
+                if (sendVerificationEmail($email, $username, $verification_code)) {
+                    $success = true;
+                } else {
+                    $errors[] = 'Could not send verification email. Please try again or contact support.';
+                }
             } catch (PDOException $e) {
                 $errors[] = 'Database error: ' . $e->getMessage();
             }
